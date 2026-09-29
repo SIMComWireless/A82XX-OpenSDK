@@ -16,24 +16,35 @@ manual itself — included so that this folder is self-contained.
 
 ## Table of contents
 
-- [Requirements](#requirements)
-- [Quick start](#quick-start)
-- [Commands](#commands)
-- [Project structure](#project-structure)
-- [Writing your code](#writing-your-code)
-- [Build output](#build-output)
-- [How the build works](#how-the-build-works)
-- [Configuration](#configuration)
-- [Troubleshooting](#troubleshooting)
-- [SDK reference](#sdk-reference)
-  - [The split compilation scheme](#the-split-compilation-scheme)
-  - [SDK directory layout](#sdk-directory-layout)
-  - [SDK packages](#sdk-packages)
-  - [Setting up the build environment](#setting-up-the-build-environment)
-  - [Building from the SDK root](#building-from-the-sdk-root)
-  - [Adding modules the SDK-native way](#adding-modules-the-sdk-native-way)
-  - [Debug version](#debug-version)
-- [Documentation](#documentation)
+- [Customer\_Application](#customer_application)
+  - [Table of contents](#table-of-contents)
+  - [Requirements](#requirements)
+  - [Quick start](#quick-start)
+  - [Commands](#commands)
+  - [Project structure](#project-structure)
+  - [Writing your code](#writing-your-code)
+  - [Build output](#build-output)
+  - [How the build works](#how-the-build-works)
+    - [Demos](#demos)
+  - [Configuration](#configuration)
+  - [Download](#download)
+  - [Debugging](#debugging)
+  - [Troubleshooting](#troubleshooting)
+  - [SDK reference](#sdk-reference)
+    - [The split compilation scheme](#the-split-compilation-scheme)
+    - [SDK directory layout](#sdk-directory-layout)
+      - [Key files](#key-files)
+    - [SDK packages](#sdk-packages)
+    - [Setting up the build environment](#setting-up-the-build-environment)
+    - [Building from the SDK root](#building-from-the-sdk-root)
+      - [Target naming](#target-naming)
+      - [Build outputs](#build-outputs)
+      - [Flash package path](#flash-package-path)
+    - [Adding modules the SDK-native way](#adding-modules-the-sdk-native-way)
+      - [The secondary-development entry point](#the-secondary-development-entry-point)
+      - [Adding a sub-application](#adding-a-sub-application)
+    - [Debug version](#debug-version)
+  - [Documentation](#documentation)
 
 ---
 
@@ -187,6 +198,46 @@ configured automatically by the build system. To trim those by hand, first enabl
 
 > After changing the configuration you must run `build.bat rebuild`, otherwise the change does not take effect.
 > This is a restriction of the SDK, not of this script.
+
+---
+
+## Download
+
+Download the tool
+[A76XX_A79XX_A82XX_MADL V1.xx Only for Update](https://1drv.ms/u/c/1964fa2b798f638e/IQB8SBaiWRXmRpHm-QCf_mmlAb0mYBGcjFdkC4sUiEteEjI?e=2K78aa),
+and follow the ASR18XX-series steps in its documentation to install the driver and flash the firmware. You will
+normally need to select `A82XX-OpenSDK\output\package\A8272E_CXSN1000_1903_V101_OPENSDK\1903SC_NOR.blf` as the
+configuration file.
+
+![FW update](resource/FW_Update.png)
+
+---
+
+## Debugging
+
+The [CATStudio](https://1drv.ms/u/c/1964fa2b798f638e/IQF7g0k6X8r3J9j5q0nY1v7lA3xW8Zt5p6yG9sV2zL4?e=2K78aa) tool can capture the
+module's log over the module's USB port. It contains every log involving the module's network, protocol stack, AT
+commands and application layer, which makes debugging easier.
+
+1. Connect the module's USB port, open CATStudio, and select the matching Diag port to connect.
+
+![Debug_1](resource/Debug_1.png)
+
+2. Once connected, click "Logger", then "Update" to select the Database file — choose `cp.mdb` from
+   `<SDK>\simcom_sdk\kernel\A8272E_CXSN1000_1903_V101_OPENSDK` in both places — and finally click "UpdateAll".
+   CATStudio can now capture the module's log.
+
+![Debug_2](resource/Debug_2.png)
+
+3. Use Ctrl+F to search for the keyword "SIMCOM" to filter, which makes the logs printed by functions such as
+   `sal_log` easier to read.
+
+![Debug_3](resource/Debug_3.png)
+
+4. If you run into a network problem or another issue and need to send a log to SIMCom, click "Log" in CATStudio
+   and then "Export Log File" to save the log file, and send it to SIMCOM's technical support.
+
+![Debug_4](resource/Debug_4.png)
 
 ---
 

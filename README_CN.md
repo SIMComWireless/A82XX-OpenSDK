@@ -15,24 +15,35 @@ ASR 1903SR / `A8272E`）编译成可烧录的固件。
 
 ## 目录
 
-- [环境要求](#环境要求)
-- [快速开始](#快速开始)
-- [命令](#命令)
-- [工程结构](#工程结构)
-- [编写你的代码](#编写你的代码)
-- [编译产物](#编译产物)
-- [编译流程](#编译流程)
-- [配置](#配置)
-- [常见问题](#常见问题)
-- [SDK 参考](#sdk-参考)
-  - [分离编译方案](#分离编译方案)
-  - [SDK 目录结构](#sdk-目录结构)
-  - [SDK 包](#sdk-包)
-  - [搭建编译环境](#搭建编译环境)
-  - [在 SDK 根目录下编译](#在-sdk-根目录下编译)
-  - [按 SDK 原生方式添加模块](#按-sdk-原生方式添加模块)
-  - [Debug 版本](#debug-版本)
-- [更多文档](#更多文档)
+- [Customer\_Application](#customer_application)
+  - [目录](#目录)
+  - [环境要求](#环境要求)
+  - [快速开始](#快速开始)
+  - [命令](#命令)
+  - [工程结构](#工程结构)
+  - [编写你的代码](#编写你的代码)
+  - [编译产物](#编译产物)
+  - [编译流程](#编译流程)
+    - [Demo](#demo)
+  - [配置](#配置)
+  - [下载](#下载)
+  - [调试](#调试)
+  - [常见问题](#常见问题)
+  - [SDK 参考](#sdk-参考)
+    - [分离编译方案](#分离编译方案)
+    - [SDK 目录结构](#sdk-目录结构)
+      - [关键文件](#关键文件)
+    - [SDK 包](#sdk-包)
+    - [搭建编译环境](#搭建编译环境)
+    - [在 SDK 根目录下编译](#在-sdk-根目录下编译)
+      - [目标名](#目标名)
+      - [SDK 编译产物](#sdk-编译产物)
+      - [烧录包路径](#烧录包路径)
+    - [按 SDK 原生方式添加模块](#按-sdk-原生方式添加模块)
+      - [二次开发入口](#二次开发入口)
+      - [添加子应用](#添加子应用)
+    - [Debug 版本](#debug-版本)
+  - [更多文档](#更多文档)
 
 ---
 
@@ -180,6 +191,37 @@ build.bat menuconfig     REM 命令行界面
 **"Configure modules compilation manually."** 这一项，然后保存并关闭。
 
 > 改完配置后必须执行 `build.bat rebuild`，否则改动不会生效。这是 SDK 自身的限制，不是本脚本的问题。
+
+---
+
+## 下载
+
+请下载工具[A76XX_A79XX_A82XX_MADL V1.xx Only for Update](https://1drv.ms/u/c/1964fa2b798f638e/IQB8SBaiWRXmRpHm-QCf_mmlAb0mYBGcjFdkC4sUiEteEjI?e=2K78aa)，参照文档中ASR18XX系列的操作步骤进行驱动安装和烧录，一般需要选择`A82XX-OpenSDK\output\package\A8272E_CXSN1000_1903_V101_OPENSDK`里面的1903SC_NOR.blf作为配置文件。
+
+![FW update](resource/FW_Update.png)
+
+---
+
+## 调试
+
+我们可以使用[CATStudio](https://1drv.ms/u/c/1964fa2b798f638e/IQF7g0k6X8r3J9j5q0nY1v7lA3xW8Zt5p6yG9sV2zL4?e=2K78aa)工具通过模块的USB端口抓取模块的log，它包含了所有涉及到模块网络、协议栈、AT命令、应用层的log信息，方便我们进行调试。
+
+1. 连接模块的USB端口，打开CATStudio工具，选择对应的Diag端口进行连接。
+
+![Debug_1](resource/Debug_1.png)
+
+2. 连接成功后，点击“Logger”按钮，点击“Update”选择Database文件，两个地方都选择`<SDK>\simcom_sdk\kernel\A8272E_CXSN1000_1903_V101_OPENSDK`里面的cp.mdb作为配置文件,最后点击“UpdateAll”，此时CATStudio工具就可以抓取模块的log了。
+
+![Debug_1](resource/Debug_2.png)
+
+3. 使用Ctrl+F搜索关键字"SIMCOM"进行过滤，方便我们查看使用sal_log等函数打印的log信息。
+
+![Debug_1](resource/Debug_3.png)
+
+
+4. 如果遇到网络问题或者其他问题需要抓取log给SIMCom的情况，请在CATStudio工具中点击“Log”按钮之后点击“Export Log File”保存log文件，并发送给SIMCom的技术支持人员。
+
+![Debug_4](resource/Debug_4.png)
 
 ---
 
