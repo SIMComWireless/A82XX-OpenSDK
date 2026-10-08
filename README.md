@@ -21,6 +21,7 @@ manual itself — included so that this folder is self-contained.
   - [Requirements](#requirements)
   - [Quick start](#quick-start)
   - [Commands](#commands)
+  - [Linux (build.sh)](#linux-buildsh)
   - [Project structure](#project-structure)
   - [Writing your code](#writing-your-code)
   - [Build output](#build-output)
@@ -60,6 +61,9 @@ manual itself — included so that this folder is self-contained.
 Some of the chip vendor's build steps are shell scripts, so SIMCOM requires the build to run in a Linux-like shell
 — git bash rather than the native Windows terminal. `build.bat` handles the invocation for you.
 
+On Linux itself, use `build.sh` instead: it needs a different set of tools, listed under
+[Linux (build.sh)](#linux-buildsh).
+
 ---
 
 ## Quick start
@@ -97,17 +101,79 @@ Run it from `cmd.exe` — double-clicked, from this folder, or from anywhere els
 
 ---
 
+## Linux (build.sh)
+
+`build.sh` is the POSIX counterpart of `build.bat` — the same scheme, the same commands, the same output. Use it
+on Linux; it also works under git bash. The two scripts are independent: `build.sh` never reads `build.bat`, and
+its `SDK_DIR` is not derived from `build.bat`'s, so each machine points its own script at the SDK as that machine
+sees it.
+
+```bash
+./build.sh              # build, incremental             (default)
+./build.sh rebuild      # clean this module, then build
+./build.sh clean        # delete the build output
+./build.sh menuconfig   # configure features, text UI
+./build.sh guiconfig    # configure features, GUI
+./build.sh restore      # put the SDK's original files back
+./build.sh help         # show usage
+```
+
+As in `build.bat`, set `SDK_DIR` at the top of the script to the SDK root — the folder containing `build.py` and
+`kernel/`:
+
+```bash
+SDK_DIR="/home/<user>/OpenSDK/2508027B01V01A8272M7B_SDK_260826/simcom_sdk"
+```
+
+That is the only line you have to change. The script locates itself, so it runs from this folder or from anywhere
+else.
+
+### Linux requirements
+
+Everything in [Requirements](#requirements) applies, with these differences on Linux:
+
+| Tool | Notes |
+| --- | --- |
+| **Python 3.6+** | SIMCOM uses 3.8.5. `build.py` uses f-strings and PEP 526 annotations, so Python 2 cannot even parse it — there is no 2.x path in this SDK, and `build.sh` version-checks the interpreter rather than trusting the name. |
+| **`kconfiglib` and its command line tools** | `pip install kconfiglib`. Needed on *every* build, not only for `menuconfig`, and `genconfig` must be reachable as a command as well — a `--user` install (in `~/.local/bin`) or a venv usually needs that directory added to the PATH. |
+| **CMake and Ninja** | The Windows tools package bundles both; on Linux nothing puts them on the PATH, and `build.py` uses a bare `cmake` and a bare `ninja` there. Install them, e.g. `apt install cmake ninja-build`. Note that `build.py` hardcodes the Ninja generator. |
+
+`guiconfig` additionally needs `tkinter` (e.g. `apt install python3-tk`).
+
+### What build.sh does on top of build.bat
+
+The Linux tools package differs from the Windows one in ways `build.py` does not cover, so `build.sh` handles
+them during its preflight and reports what it changed:
+
+- **Unpacks `cross_tool.tar.bz2`.** The Linux package ships the cross toolchain packed, but `build.py` only
+  looks for `cross_tool.zip`, so nothing else would ever unpack it. When
+  `tools/linux/cross_tool/gcc-arm-none-eabi/bin` is missing, `build.sh` extracts the archive into `tools/linux/`.
+- **Restores the tools' executable bits and the `lzma` name.** The package ships the LZMA tool as
+  `lzma_asr_lnx`, while the SDK's `toolchain.cmake` calls the bare name `lzma`; and a tools directory that has
+  been copied around or restored from a backup loses its executable bits entirely. Either one makes the build
+  fail at its very last step. `build.sh` chmods the tools and creates `tools/linux/lzma -> lzma_asr_lnx` when
+  needed, printing a ` Repaired : ...` line for each change.
+- **Puts `tools/linux` at the front of the PATH** for the packaging step, so the SDK's own `crc_set` and `lzma`
+  win over any distribution tool of the same name. Ubuntu's `xz-utils` installs an unrelated `lzma` that has no
+  `e` subcommand, and `lzma e <in> <out>` is what packaging calls.
+- **Checks the prerequisites before building** — the Python version, `kconfiglib` and `genconfig`, `cmake`,
+  `ninja`, and the tools package itself — so a missing tool is one explanatory sentence rather than a traceback
+  from deep inside the SDK.
+
+---
+
 ## Project structure
 
 ```text
 Customer_Application
 |- build.bat            the build script; SDK_DIR is set at the top
+|- build.sh             the same for Linux; SDK_DIR is set at the top
 |- customer_code        ALL the code — this is the part you edit
 |  |- main.c            the SDK entry point (copied over AL\APP\main.c)
 |  |- CMakeLists.txt    builds everything under src\ into one library
 |  |- inc               headers
 |  |- src               sources
-|- output               build artifacts, written by build.bat
+|- output               build artifacts, written by build.bat (build.sh on Linux)
 ```
 
 Nothing here is tied to this location — the whole folder can be copied or moved.
@@ -172,7 +238,7 @@ Every build performs these steps:
 6. Copies the firmware, the logs and the flash package back into `output\`.
 
 That is the entire footprint on the SDK. `build.bat restore` undoes steps 1–4 and puts the SDK back exactly as
-shipped.
+shipped — `build.sh restore` on Linux, where the scheme is identical ([Linux (build.sh)](#linux-buildsh)).
 
 ### Demos
 
@@ -248,6 +314,10 @@ commands and application layer, which makes debugging easier.
 | `ERROR: no build.py under SDK_DIR` or `no kernel\ directory under SDK_DIR` | `SDK_DIR` at the top of `build.bat` does not point at an SDK root. It must be the folder containing `build.py` and `kernel/`. |
 | `ERROR: cannot detect the module name` | No module directory was found under `<SDK>\kernel\`. Set `APP_TARGET` explicitly at the top of `build.bat`. |
 | `ERROR: python is not on PATH` | Install Python 3 and put it on the PATH — see [Requirements](#requirements). |
+| `./build.sh: Permission denied` | `build.sh` lost its executable bit, which copying the folder around can do. Run `chmod +x build.sh`, or invoke it as `bash build.sh`. |
+| `ERROR: no Python 3.6 or newer on PATH`, or `kconfiglib is not installed for …` | Linux prerequisites — see [Linux requirements](#linux-requirements). |
+| CMake reports it cannot find a build program for `"Ninja"`, or `ERROR: "ninja" is not on PATH` | `build.py` hardcodes the Ninja generator. Install it: `apt install ninja-build`, or `pip install ninja`. |
+| `lzma: e: No such file or directory` during packaging | The `lzma` that ran was `xz-utils`', which has no `e` subcommand, so the SDK's own tool was not found. `build.sh` repairs this by itself — see [What build.sh does on top of build.bat](#what-buildsh-does-on-top-of-buildbat). If you see it while running `build.py` directly, use `./build.sh` instead. |
 | The build fails while extracting `cmake.zip` / `cross_tool.zip` | The SDK's `tools/win32/` package is missing — see [SDK packages](#sdk-packages). |
 | A configuration change had no effect | Run `build.bat rebuild`. The SDK requires a clean after a Kconfig change. |
 | The build failed but the log looks fine | `build.py` always exits `0`, even when the compiler fails; it only prints a marker. `build.bat` reads `>>>>> build successed. <<<<<` from `output\build_<module>.log` to decide, so trust the `BUILD SUCCEEDED` / `BUILD FAILED` banner it prints. |
