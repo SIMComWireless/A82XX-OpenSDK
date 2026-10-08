@@ -20,6 +20,7 @@ ASR 1903SR / `A8272E`）编译成可烧录的固件。
   - [环境要求](#环境要求)
   - [快速开始](#快速开始)
   - [命令](#命令)
+  - [Linux 下的 build.sh](#linux-下的-buildsh)
   - [工程结构](#工程结构)
   - [编写你的代码](#编写你的代码)
   - [编译产物](#编译产物)
@@ -59,6 +60,8 @@ ASR 1903SR / `A8272E`）编译成可烧录的固件。
 芯片原厂的一部分编译步骤是 shell 脚本，所以 SIMCOM 要求编译在类 Linux 的 shell 环境下进行 —— 用 git bash
 而不是 Windows 原生终端。`build.bat` 已经替你处理了调用方式。
 
+在 Linux 上则改用 `build.sh`：它需要的工具集不同，见 [Linux 下的 build.sh](#linux-下的-buildsh)。
+
 ---
 
 ## 快速开始
@@ -96,17 +99,75 @@ build.bat help           REM 显示用法
 
 ---
 
+## Linux 下的 build.sh
+
+`build.sh` 是 `build.bat` 在 POSIX 环境下的对应脚本 —— 同样的方案、同样的命令、同样的产物，在 Linux 上用它，
+在 git bash 下也能用。两个脚本互相独立：`build.sh` 不会去读 `build.bat`，它的 `SDK_DIR` 也不是从
+`build.bat` 推出来的，所以每台机器各自把脚本指向本机看到的 SDK 路径。
+
+```bash
+./build.sh              # 编译，增量编译              （默认）
+./build.sh rebuild      # 先 clean 本模块，再编译
+./build.sh clean        # 删除编译输出
+./build.sh menuconfig   # 配置功能开关，文本界面
+./build.sh guiconfig    # 配置功能开关，图形界面
+./build.sh restore      # 把 SDK 的原始文件放回去
+./build.sh help         # 显示用法
+```
+
+和 `build.bat` 一样，第一次编译前先把脚本开头的 `SDK_DIR` 设置成 SDK 根目录 —— 也就是包含 `build.py` 和
+`kernel/` 的那一层：
+
+```bash
+SDK_DIR="/home/<user>/OpenSDK/2508027B01V01A8272M7B_SDK_260826/simcom_sdk"
+```
+
+这是你唯一需要改的一行。脚本会自己定位所在目录，所以在本目录运行、在任意其他目录运行都可以。
+
+### Linux 环境要求
+
+[环境要求](#环境要求)里的内容都适用，在 Linux 上还有下面这些差异：
+
+| 工具 | 说明 |
+| --- | --- |
+| **Python 3.6+** | SIMCOM 使用 3.8.5。`build.py` 用了 f-string 和 PEP 526 变量注解，Python 2 连解析都过不了 —— 这个 SDK 里没有 2.x 的路径；`build.sh` 会检查解释器版本，而不是只看名字。 |
+| **`kconfiglib` 及其命令行工具** | `pip install kconfiglib`。不只是 `menuconfig` 需要，**每次编译**都需要；而且 `genconfig` 也必须能作为命令被调用 —— 用 `--user` 安装（在 `~/.local/bin`）或放在 venv 里时，通常要把该目录加进 PATH。 |
+| **CMake 和 Ninja** | Windows 工具包自带这两个，Linux 上则没有东西把它们放进 PATH，而 `build.py` 在 Linux 上用的就是 PATH 里裸的 `cmake` 和 `ninja`。需要自行安装，例如 `apt install cmake ninja-build`。注意 `build.py` 把生成器写死为 Ninja。 |
+
+`guiconfig` 还需要 `tkinter`（例如 `apt install python3-tk`）。
+
+### build.sh 比 build.bat 多做的事
+
+Linux 工具包和 Windows 工具包有若干差异，而 `build.py` 并不处理这些差异，所以 `build.sh` 在预检阶段替它处理，
+并把改动打印出来：
+
+- **解压 `cross_tool.tar.bz2`。** Linux 工具包里交叉工具链是压缩状态，而 `build.py` 只认 `cross_tool.zip`，
+  别的东西不会去解压它。当 `tools/linux/cross_tool/gcc-arm-none-eabi/bin` 不存在时，`build.sh` 会把压缩包
+  解到 `tools/linux/` 下。
+- **恢复工具的可执行权限和 `lzma` 这个名字。** 工具包里的 LZMA 工具叫 `lzma_asr_lnx`，而 SDK 的
+  `toolchain.cmake` 要的是裸名 `lzma`；另外，经过复制或从备份还原的工具目录会整体丢掉可执行权限。这两件事
+  都会让编译在最后一步失败。`build.sh` 会在需要时给工具加回执行权限、并建立
+  `tools/linux/lzma -> lzma_asr_lnx`，每处改动打印一行 ` Repaired : ...`。
+- **把 `tools/linux` 放到 PATH 最前面**，供打包步骤使用，这样 SDK 自带的 `crc_set` 和 `lzma` 会优先于同名的
+  发行版工具。Ubuntu 的 `xz-utils` 会装一个无关的 `lzma`，它没有 `e` 子命令，而打包调用的正是
+  `lzma e <in> <out>`。
+- **编译前先检查依赖** —— Python 版本、`kconfiglib` 与 `genconfig`、`cmake`、`ninja`，以及工具包本身是否
+  就位 —— 这样缺东西时得到的是一句说明，而不是从 SDK 深处抛出来的 traceback。
+
+---
+
 ## 工程结构
 
 ```text
 Customer_Application
 |- build.bat            编译脚本；SDK_DIR 在文件开头设置
+|- build.sh             同上，Linux 下使用的编译脚本；SDK_DIR 在文件开头设置
 |- customer_code        全部代码 —— 你要改的就是这里
 |  |- main.c            SDK 入口（会被复制覆盖 AL\APP\main.c）
 |  |- CMakeLists.txt    把 src\ 下的所有源文件编成一个库
 |  |- inc               头文件
 |  |- src               源文件
-|- output               编译产物，由 build.bat 写入
+|- output               编译产物，由 build.bat 写入（Linux 下是 build.sh）
 ```
 
 这里没有任何东西和当前位置绑定 —— 整个目录可以随意复制或移动。
@@ -167,7 +228,8 @@ SDK 根目录下的 HAL / MAL / SAL / PL 头文件说明了 SDK 提供的能力�
 5. 用 SDK 自带的 `python build.py <module>_app` 编译。
 6. 把固件、日志和烧录包复制回 `output\`。
 
-这就是对 SDK 的全部改动。`build.bat restore` 会撤销第 1~4 步，把 SDK 完全恢复成出厂时的样子。
+这就是对 SDK 的全部改动。`build.bat restore` 会撤销第 1~4 步，把 SDK 完全恢复成出厂时的样子（Linux 下是
+`build.sh restore`，方案完全相同，见 [Linux 下的 build.sh](#linux-下的-buildsh)）。
 
 ### Demo
 
@@ -232,6 +294,10 @@ build.bat menuconfig     REM 命令行界面
 | `ERROR: no build.py under SDK_DIR` 或 `no kernel\ directory under SDK_DIR` | `build.bat` 开头的 `SDK_DIR` 没有指向 SDK 根目录。它必须是包含 `build.py` 和 `kernel/` 的那一层。 |
 | `ERROR: cannot detect the module name` | `<SDK>\kernel\` 下没有找到模块目录。在 `build.bat` 开头显式设置 `APP_TARGET`。 |
 | `ERROR: python is not on PATH` | 安装 Python 3 并加入 PATH —— 见[环境要求](#环境要求)。 |
+| `./build.sh: Permission denied` | `build.sh` 丢了可执行权限（目录被复制时可能发生）。执行 `chmod +x build.sh`，或者用 `bash build.sh` 调用。 |
+| `ERROR: no Python 3.6 or newer on PATH`，或 `kconfiglib is not installed for …` | Linux 环境要求 —— 见 [Linux 环境要求](#linux-环境要求)。 |
+| CMake 报找不到 `"Ninja"` 对应的编译程序，或 `ERROR: "ninja" is not on PATH` | `build.py` 把生成器写死为 Ninja，需要安装：`apt install ninja-build`，或 `pip install ninja`。 |
+| 打包时报 `lzma: e: No such file or directory` | 实际跑的是 `xz-utils` 的 `lzma`，它没有 `e` 子命令，说明没用上 SDK 自带的工具。`build.sh` 会自动修好 —— 见 [build.sh 比 build.bat 多做的事](#buildsh-比-buildbat-多做的事)。如果是直接运行 `build.py` 时出现，改用 `./build.sh`。 |
 | 编译在解压 `cmake.zip` / `cross_tool.zip` 时失败 | SDK 的 `tools/win32/` 包没放 —— 见 [SDK 包](#sdk-包)。 |
 | 改了配置却没有生效 | 执行 `build.bat rebuild`。Kconfig 改动后 SDK 要求先 clean。 |
 | 编译明明失败了，日志却看不出问题 | `build.py` 无论成功失败都返回 `0`，只打印一行标记。`build.bat` 是靠读取 `output\build_<module>.log` 里的 `>>>>> build successed. <<<<<` 来判断的，所以以它最后打印的 `BUILD SUCCEEDED` / `BUILD FAILED` 为准。 |
